@@ -33,8 +33,6 @@ This project automates the collection process so that forwarding a post is enoug
   <img src="assets/architecture.png" alt="Opportunity Tracker Architecture" width="900">
 </p>
 
-For a detailed explanation of each workflow, see [`docs/documentation.md`](docs/documentation.md).
-
 ---
 
 ## Tech Stack
@@ -85,15 +83,12 @@ Opportunity-Tracker/
 ├── database/
 │   └── schema.sql
 │
-├── docs/
-│   └── documentation.md
-│
 ├── screenshots/
 │   ├── dashboard.png
 │   ├── google-sheets.png
 │   ├── n8n-workflow.png
 │   ├── postgresql.png
-│   └── telegram.png
+│   └── telegram.jpeg
 │
 └── workflow/
     └── n8n-workflow-export.json
@@ -128,8 +123,6 @@ This project requires configuring a few free services before it can run.
 
 7. Update the dashboard webhook URL if deploying your own copy.
 
-Detailed setup instructions are available in [`docs/documentation.md`](docs/documentation.md).
-
 ---
 
 ## Screenshots
@@ -152,7 +145,7 @@ Detailed setup instructions are available in [`docs/documentation.md`](docs/docu
 
 ### Telegram Bot
 
-![Telegram Bot](screenshots/telegram.png)
+![Telegram Bot](screenshots/telegram.jpeg)
 
 ---
 
