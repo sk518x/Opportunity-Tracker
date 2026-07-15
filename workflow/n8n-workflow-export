@@ -1,0 +1,1899 @@
+{
+  "name": "Opportunity Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "6171a2b9-72f4-4fcd-ba9f-d332c0e9d9e8",
+      "name": "New Telegram Message",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -752,
+        -560
+      ],
+      "webhookId": "e7984b01-c145-4585-8939-a1f06bbb985f",
+      "credentials": {
+        "telegramApi": {
+          "id": "vcY5UV3ZAITilGoT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"llama-3.3-70b-versatile\",\n  messages: [{\n    role: \"user\",\n    content: \"You extract structured data from a forwarded post about a bursary, internship, or graduate program. Today's date is \" + $now.toFormat('yyyy-MM-dd') + \". Read the text below and return ONLY a raw JSON object (no markdown, no code fences) with these exact keys: title (string), org (string), type (one of: Bursary, Internship, Graduate Program, Learnership, Other), deadline (string, format YYYY-MM-DD, infer year if missing, empty string if no date mentioned), link (string, empty if none), requirements (string, short summary of eligibility criteria). Text:\\n\\n\" + $json.content\n  }]\n}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "96db155b-3146-4c1a-9038-e578fae6804e",
+      "name": "Extract With Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        736,
+        -576
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hWKVsEJ8JiFKbeNE",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.choices[0].message.content;\nconst withoutThinking = raw.replace(/<think>[\\s\\S]*?<\\/think>/gi, '').trim();\nconst jsonMatch = withoutThinking.match(/\\{[\\s\\S]*\\}/);\nconst cleaned = jsonMatch ? jsonMatch[0] : withoutThinking;\nlet data;\ntry {\n  data = JSON.parse(cleaned);\n} catch (e) {\n  data = { title: 'Could not parse — check manually', org: '', type: 'Other', deadline: '', link: '', requirements: raw.slice(0, 200) };\n}\nconst validTypes = ['Bursary', 'Internship', 'Graduate Program', 'Learnership', 'Other'];\nif (!validTypes.includes(data.type)) {\n  data.type = 'Other';\n}\ndata.status = 'Not started';\ndata.added_on = $now.toFormat('yyyy-MM-dd');\ndata.chat_id = $('Classify Message').item.json.chat_id;\nreturn [{ json: data }];"
+      },
+      "id": "b59e086a-c3cc-41c2-a158-5773a42bb2ed",
+      "name": "Parse Extracted Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        -544
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "32174795-9341-4577-aa0b-3f07de28df95",
+      "name": "Every Morning 7am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -864,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.send }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "id": "69da16a9-0300-4b0f-af19-87a842dd7a8a"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "81a59962-7850-48c9-9c86-f65759e4c0b0",
+      "name": "Anything Urgent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1744,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "8316789446",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "f67464a5-43b4-4b27-88a8-9cc6896590d4",
+      "name": "Send Reminder",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2048,
+        400
+      ],
+      "webhookId": "6447711a-9671-4ee5-9a22-6b6b688a2ebe",
+      "credentials": {
+        "telegramApi": {
+          "id": "vcY5UV3ZAITilGoT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $json.message;\nlet type = 'text';\nlet content = '';\n\nif (msg.photo && msg.photo.length > 0) {\n  type = 'photo';\n  content = msg.photo[msg.photo.length - 1].file_id;\n} else if (msg.text && /^https?:\\/\\/\\S+$/i.test(msg.text.trim())) {\n  type = 'link';\n  content = msg.text.trim();\n} else {\n  type = 'text';\n  content = msg.text || msg.caption || '';\n}\n\nreturn [{ json: { type, content, chat_id: msg.chat.id } }];"
+      },
+      "id": "020a7925-c890-461c-8b98-1367e4d3b2d1",
+      "name": "Classify Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        -544
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "26f78fcc-cec8-4c89-92cb-8398a3acf948"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "85bab9b4-5332-4aa4-965c-47e73b1c20f4",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "link",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "fc3e4a41-35d7-4f4d-bb25-17f8bb75cdba",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "photo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        -560
+      ],
+      "id": "8722585d-fad5-458f-9775-e597cad4197a",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.content }} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        -464
+      ],
+      "id": "ad9bd813-2155-443f-ab66-3b3fd115366f",
+      "name": "Fetch Link Page"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $json.data || $json.body || String($json);\n   let text = html\n     .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n     .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n     .replace(/<[^>]+>/g, ' ')\n     .replace(/\\s+/g, ' ')\n     .trim();\n   text = text.slice(0, 3000);\n   \n   return [{ json: { content: text, chat_id: $('Classify Message').item.json.chat_id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -448
+      ],
+      "id": "d5c2a26f-3548-42e9-ab3a-3203613da867",
+      "name": "Strip HTML"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/getFile?file_id={{ $json.content }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        -192
+      ],
+      "id": "3f3f3605-f51f-47bc-a22f-f958a108564e",
+      "name": "Get File Path"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/file/botYOUR_TELEGRAM_BOT_TOKEN/{{ $json.result.file_path }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        -192
+      ],
+      "id": "66c11d3f-e436-4699-9a65-e73a0332e459",
+      "name": "Download Photo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst base64 = buffer.toString('base64');\nreturn [{ json: { image_base64: base64, chat_id: $('Classify Message').item.json.chat_id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        -208
+      ],
+      "id": "a98d0746-91a3-4557-a473-ad5c4f221709",
+      "name": "Encode Image"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n      model: \"qwen/qwen3.6-27b\",\n      messages: [{\n        role: \"user\",\n        content: [\n          { type: \"text\", text: \"You extract structured data from a photo of a bursary, internship, or graduate program advert. Today's date is \" + $now.toFormat('yyyy-MM-dd') + \". Return ONLY a raw JSON object (no markdown, no code fences) with these exact keys: title, org, type (Bursary/Internship/Graduate Program/Learnership/Other), deadline (YYYY-MM-DD, empty if not shown), link (empty if none), requirements (short summary).\" },\n          { type: \"image_url\", image_url: { url: \"data:image/jpeg;base64,\" + $json.image_base64 } }\n        ]\n      }]\n    }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        992,
+        -224
+      ],
+      "id": "75d68bdc-ee88-45ff-b29a-fd4a63521ebc",
+      "name": "Extract From Photo",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hWKVsEJ8JiFKbeNE",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\n   data.dedup_key = (data.title + '|' + data.org).toLowerCase().replace(/\\s+/g, ' ').trim();\n   return [{ json: data }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        -544
+      ],
+      "id": "f8df32c2-9e76-47c9-b05f-8351b36e8308",
+      "name": "Build Dedup Key"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO opportunities (title, org, type, deadline, link, requirements, status, added_on, dedup_key)\n     VALUES ($1, $2, $3, NULLIF($4,'')::date, $5, $6, $7, CURRENT_DATE, $8)\n     ON CONFLICT (dedup_key) DO NOTHING\n     RETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$json.title, $json.org, $json.type, $json.deadline, $json.link, $json.requirements, $json.status, $json.dedup_key] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1744,
+        -528
+      ],
+      "id": "eb344a27-e897-40bd-9917-9e4ba171e31d",
+      "name": "Insert To Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "ePzCG2J1hkev63dL",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Parse Extracted Data').item.json.chat_id, text: \"Added: \" + $('Parse Extracted Data').item.json.title }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2064,
+        -528
+      ],
+      "id": "98553296-8fce-46ac-96c3-2a624c66ddd4",
+      "name": "Confirm To Me"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM opportunities;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -480,
+        480
+      ],
+      "id": "ef8eb276-9b30-48fd-b9e2-1b109d71bcb4",
+      "name": "Read All From Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "ePzCG2J1hkev63dL",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\n\nlet results = items.map(item => {\n  const d = item.json;\n  if (d.deadline) d.deadline = String(d.deadline).slice(0, 10);\n  if (d.added_on) d.added_on = String(d.added_on).slice(0, 10);\n  let daysLeft = '';\n  if (d.deadline) {\n    const dl = new Date(d.deadline);\n    daysLeft = Math.round((dl - today) / 86400000);\n  }\n  const bucket = (daysLeft !== '' && daysLeft < 0 && d.status !== 'Submitted') ? 'expired' : 'active';\n  return { json: { ...d, days_left: daysLeft, bucket } };\n});\n\nresults.sort((a, b) => {\n  const da = a.json.days_left === '' ? 999999 : a.json.days_left;\n  const db = b.json.days_left === '' ? 999999 : b.json.days_left;\n  return da - db;\n});\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        528
+      ],
+      "id": "79602f46-7ad9-4869-9fb6-a44d625a3b48",
+      "name": "Calculate Days & Split"
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Active",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0/edit#gid=0"
+        },
+        "clear": "specificRange",
+        "range": "A2:Z1000"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        688,
+        288
+      ],
+      "id": "478146af-a048-4612-9ecc-2b1dbf99d122",
+      "name": "Clear Active Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "W3BP0yyPuh70Xj1f",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Calculate Days & Split').all().filter(i => i.json.bucket === 'active');"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        288
+      ],
+      "id": "1fb4c402-a3a7-4e4c-9115-9abe4843b732",
+      "name": "Refetch Active Rows"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Active",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $json.title }}",
+            "org": "={{ $json.org }}",
+            "type": "={{ $json.type }}",
+            "deadline": "={{ $json.deadline }}",
+            "link": "={{ $json.link }}",
+            "requirements": "={{ $json.requirements }}",
+            "status": "={{ $json.status }}",
+            "added_on": "={{ $json.added_on }}",
+            "days_left": "={{ $json.days_left }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "org",
+              "displayName": "org",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deadline",
+              "displayName": "deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requirements",
+              "displayName": "requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "added_on",
+              "displayName": "added_on",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days_left",
+              "displayName": "days_left",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1392,
+        176
+      ],
+      "id": "bc5084bd-3cc5-44b7-8740-4f16557ec1d1",
+      "name": "Write Active Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "W3BP0yyPuh70Xj1f",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1913031326,
+          "mode": "list",
+          "cachedResultName": "Expired",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0/edit#gid=1913031326"
+        },
+        "clear": "specificRange",
+        "range": "Expired!A2:Z1000"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        704,
+        912
+      ],
+      "id": "90bbb542-9878-4ead-8482-c783ab5d44fc",
+      "name": "Clear Expired Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "W3BP0yyPuh70Xj1f",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Calculate Days & Split').all().filter(i => i.json.bucket === 'expired');"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        896
+      ],
+      "id": "c00afb85-3944-4d62-afd1-36336d664591",
+      "name": "Refetch Expired Rows"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1913031326,
+          "mode": "list",
+          "cachedResultName": "Expired",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0/edit#gid=1913031326"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $json.title }}",
+            "org": "={{ $json.org }}",
+            " type": "={{ $json.type }}",
+            "deadline": "={{ $json.deadline }}",
+            " link": "={{ $json.link }}",
+            "requirements": "={{ $json.requirements }}",
+            "status": "={{ $json.status }}",
+            "added_on": "={{ $json.added_on }}",
+            "days_left": "={{ $json.days_left }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "org",
+              "displayName": "org",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": " type",
+              "displayName": " type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deadline",
+              "displayName": "deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " link",
+              "displayName": " link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requirements",
+              "displayName": "requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "added_on",
+              "displayName": "added_on",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days_left",
+              "displayName": "days_left",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        1104
+      ],
+      "id": "4b190f6e-15ba-47aa-bf46-32367e1eaa9c",
+      "name": "Write Expired Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "W3BP0yyPuh70Xj1f",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE opportunities SET status = 'Expired' WHERE dedup_key = $1;",
+        "options": {
+          "queryReplacement": "={{ [$json.dedup_key] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1376,
+        832
+      ],
+      "id": "6adb5825-b9a5-4e61-8362-a057d87bdbac",
+      "name": "Mark Expired In DB",
+      "credentials": {
+        "postgres": {
+          "id": "ePzCG2J1hkev63dL",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst urgent = items.filter(i => i.json.days_left !== '' && i.json.days_left <= 5 && i.json.days_left >= 0);\n\nif (urgent.length === 0) {\n  return [{ json: { send: false } }];\n}\n\nlet msg = 'Closing within 5 days:\\n\\n';\nurgent.forEach(i => {\n  msg += `- ${i.json.title} (${i.json.org}) — ${i.json.days_left} day(s) left\\n`;\n});\n\nreturn [{ json: { send: true, message: msg } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        416
+      ],
+      "id": "66ba2f13-2995-4711-8c2e-81507590a9e8",
+      "name": "Build Digest Message"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "422f9431-5113-48ca-b485-9ae691a326ab",
+              "leftValue": "={{ $json.bucket }}",
+              "rightValue": "active",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        288,
+        304
+      ],
+      "id": "801ae981-4952-469a-a78d-3eaa1fa68151",
+      "name": "Is Active"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e7129716-4a17-46f7-bf70-15a70d7ea306",
+              "leftValue": "={{ $json.bucket }}",
+              "rightValue": "expired",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        272,
+        832
+      ],
+      "id": "5b3a189a-cf66-4292-a99a-7e351d7646b9",
+      "name": "Is Expired"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM opportunities;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2080,
+        -224
+      ],
+      "id": "7a82c481-a9a1-4b32-98b4-6995c846ad96",
+      "name": "Instant: Read All From Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "ePzCG2J1hkev63dL",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\n\nlet results = items.map(item => {\n  const d = item.json;\n  if (d.deadline) d.deadline = String(d.deadline).slice(0, 10);\n  if (d.added_on) d.added_on = String(d.added_on).slice(0, 10);\n  let daysLeft = '';\n  if (d.deadline) {\n    const dl = new Date(d.deadline);\n    daysLeft = Math.round((dl - today) / 86400000);\n  }\n  const bucket = (daysLeft !== '' && daysLeft < 0 && d.status !== 'Submitted') ? 'expired' : 'active';\n  return { json: { ...d, days_left: daysLeft, bucket } };\n});\n\nresults.sort((a, b) => {\n  const da = a.json.days_left === '' ? 999999 : a.json.days_left;\n  const db = b.json.days_left === '' ? 999999 : b.json.days_left;\n  return da - db;\n});\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        -208
+      ],
+      "id": "7f2890d5-3c6a-4f31-85a1-57c9192fc827",
+      "name": "Instant: Calculate Days & Split"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "422f9431-5113-48ca-b485-9ae691a326ab",
+              "leftValue": "={{ $json.bucket }}",
+              "rightValue": "active",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2672,
+        -384
+      ],
+      "id": "bf31ec8a-5085-4acc-a20b-f6008563d436",
+      "name": "Instant: Is Active"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e7129716-4a17-46f7-bf70-15a70d7ea306",
+              "leftValue": "={{ $json.bucket }}",
+              "rightValue": "expired",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2688,
+        -128
+      ],
+      "id": "d593aee5-742d-4e43-9263-7bc0c8368781",
+      "name": "Instant: Is Expired"
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1913031326,
+          "mode": "list",
+          "cachedResultName": "Expired",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0/edit#gid=1913031326"
+        },
+        "clear": "specificRange",
+        "range": "Expired!A2:Z1000"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3008,
+        -128
+      ],
+      "id": "171380db-c4ee-496f-ab5d-93e3055700af",
+      "name": "Instant: Clear Expired Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "W3BP0yyPuh70Xj1f",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Active",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0/edit#gid=0"
+        },
+        "clear": "specificRange",
+        "range": "A2:Z1000"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2992,
+        -416
+      ],
+      "id": "83fff882-6110-4dfc-bd33-f6c9b151fd45",
+      "name": "Instant: Clear Active Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "W3BP0yyPuh70Xj1f",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Instant: Calculate Days & Split').all().filter(i => i.json.bucket === 'active');"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3280,
+        -416
+      ],
+      "id": "cc9ee435-6bba-4534-8ba0-fccd94f9a614",
+      "name": "Instant: Refetch Active Rows"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Instant: Calculate Days & Split').all().filter(i => i.json.bucket === 'expired');"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3280,
+        -112
+      ],
+      "id": "eeafc0bd-a8e3-459d-94d1-05069090bfc9",
+      "name": "Instant: Refetch Expired Rows"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE opportunities SET status = 'Expired' WHERE dedup_key = $1;",
+        "options": {
+          "queryReplacement": "={{ [$json.dedup_key] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3616,
+        144
+      ],
+      "id": "49499a7a-c54b-4a49-8c0f-2cb20742e833",
+      "name": "Instant: Mark Expired In DB",
+      "credentials": {
+        "postgres": {
+          "id": "ePzCG2J1hkev63dL",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1913031326,
+          "mode": "list",
+          "cachedResultName": "Expired",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0/edit#gid=1913031326"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $json.title }}",
+            "org": "={{ $json.org }}",
+            " type": "={{ $json.type }}",
+            "deadline": "={{ $json.deadline }}",
+            " link": "={{ $json.link }}",
+            "requirements": "={{ $json.requirements }}",
+            "status": "={{ $json.status }}",
+            "added_on": "={{ $json.added_on }}",
+            "days_left": "={{ $json.days_left }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "org",
+              "displayName": "org",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": " type",
+              "displayName": " type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deadline",
+              "displayName": "deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " link",
+              "displayName": " link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requirements",
+              "displayName": "requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "added_on",
+              "displayName": "added_on",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days_left",
+              "displayName": "days_left",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3616,
+        -112
+      ],
+      "id": "212a6a66-d065-432d-86d2-8c52c59e1a7b",
+      "name": "Instant: Write Expired Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "W3BP0yyPuh70Xj1f",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Active",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Y9-FKpt_OpCWIn3LU0Kf37p-TSgVWQ3QliwqwLJFax0/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $json.title }}",
+            "org": "={{ $json.org }}",
+            "type": "={{ $json.type }}",
+            "deadline": "={{ $json.deadline }}",
+            "link": "={{ $json.link }}",
+            "requirements": "={{ $json.requirements }}",
+            "status": "={{ $json.status }}",
+            "added_on": "={{ $json.added_on }}",
+            "days_left": "={{ $json.days_left }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "org",
+              "displayName": "org",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deadline",
+              "displayName": "deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requirements",
+              "displayName": "requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "added_on",
+              "displayName": "added_on",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days_left",
+              "displayName": "days_left",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3584,
+        -416
+      ],
+      "id": "81266bbf-b731-4da9-83c5-f6f4ff4d702e",
+      "name": "Instant: Write Active Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "W3BP0yyPuh70Xj1f",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "opportunities",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -832,
+        1216
+      ],
+      "id": "9cc9b4a4-e3ce-4f4d-934b-65836c411480",
+      "name": "Dashboard API",
+      "webhookId": "6bc930b0-30b1-4796-bd96-ee68e21cc4b4"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM opportunities ORDER BY deadline ASC NULLS LAST;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -544,
+        1216
+      ],
+      "id": "1ecf4e33-2a5d-40a7-b141-dfc3870aff8b",
+      "name": "Query For Dashboard",
+      "credentials": {
+        "postgres": {
+          "id": "ePzCG2J1hkev63dL",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.all().map(i => i.json)) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -208,
+        1216
+      ],
+      "id": "d12d9796-9f24-435b-97f3-f9545f629ae8",
+      "name": "Send Dashboard Data"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Classify Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract With Gemini": {
+      "main": [
+        [
+          {
+            "node": "Parse Extracted Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Extracted Data": {
+      "main": [
+        [
+          {
+            "node": "Build Dedup Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Morning 7am": {
+      "main": [
+        [
+          {
+            "node": "Read All From Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything Urgent?": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Message": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Extract With Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Link Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get File Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Link Page": {
+      "main": [
+        [
+          {
+            "node": "Strip HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strip HTML": {
+      "main": [
+        [
+          {
+            "node": "Extract With Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File Path": {
+      "main": [
+        [
+          {
+            "node": "Download Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Photo": {
+      "main": [
+        [
+          {
+            "node": "Encode Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encode Image": {
+      "main": [
+        [
+          {
+            "node": "Extract From Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract From Photo": {
+      "main": [
+        [
+          {
+            "node": "Parse Extracted Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dedup Key": {
+      "main": [
+        [
+          {
+            "node": "Insert To Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert To Postgres": {
+      "main": [
+        [
+          {
+            "node": "Confirm To Me",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Instant: Read All From Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm To Me": {
+      "main": [
+        []
+      ]
+    },
+    "Read All From Postgres": {
+      "main": [
+        [
+          {
+            "node": "Calculate Days & Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Days & Split": {
+      "main": [
+        [
+          {
+            "node": "Is Active",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Expired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Active Tab": {
+      "main": [
+        [
+          {
+            "node": "Refetch Active Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refetch Active Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Active Tab",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Digest Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Expired Tab": {
+      "main": [
+        [
+          {
+            "node": "Refetch Expired Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refetch Expired Rows": {
+      "main": [
+        [
+          {
+            "node": "Mark Expired In DB",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Expired Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Expired In DB": {
+      "main": [
+        []
+      ]
+    },
+    "Build Digest Message": {
+      "main": [
+        [
+          {
+            "node": "Anything Urgent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Active": {
+      "main": [
+        [
+          {
+            "node": "Clear Active Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Expired": {
+      "main": [
+        [
+          {
+            "node": "Clear Expired Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instant: Read All From Postgres": {
+      "main": [
+        [
+          {
+            "node": "Instant: Calculate Days & Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instant: Calculate Days & Split": {
+      "main": [
+        [
+          {
+            "node": "Instant: Is Active",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Instant: Is Expired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instant: Is Active": {
+      "main": [
+        [
+          {
+            "node": "Instant: Clear Active Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instant: Is Expired": {
+      "main": [
+        [
+          {
+            "node": "Instant: Clear Expired Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instant: Clear Expired Tab": {
+      "main": [
+        [
+          {
+            "node": "Instant: Refetch Expired Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instant: Clear Active Tab": {
+      "main": [
+        [
+          {
+            "node": "Instant: Refetch Active Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instant: Refetch Active Rows": {
+      "main": [
+        [
+          {
+            "node": "Instant: Write Active Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instant: Refetch Expired Rows": {
+      "main": [
+        [
+          {
+            "node": "Instant: Mark Expired In DB",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Instant: Write Expired Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dashboard API": {
+      "main": [
+        [
+          {
+            "node": "Query For Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query For Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Send Dashboard Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6a830bde-01f4-47c3-959a-eb0b078b4996",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "175f061fb45f6d3836287c0373b6ed21a679d0231b55de22e0fbbe0a05501160"
+  },
+  "nodeGroups": [],
+  "id": "2EghIxN6sFk49tps",
+  "tags": []
+}
