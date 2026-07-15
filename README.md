@@ -1,6 +1,6 @@
 # Opportunity Tracker
 
-An automated pipeline that collects bursary, internship and graduate programme opportunities shared across WhatsApp, Facebook and LinkedIn, then organizes them into a PostgreSQL database, Google Sheets tracker and web dashboard.
+An automated pipeline that collects bursary, internship and graduate programme opportunities shared across platforms like WhatsApp, Facebook and LinkedIn, then organizes them into a PostgreSQL database, Google Sheets tracker and web dashboard.
 
 Forward a post to a Telegram bot → AI extracts the important details → n8n stores them in PostgreSQL and automatically updates Google Sheets and the dashboard.
 
