@@ -75,7 +75,6 @@ For a detailed explanation of each workflow, see [`docs/documentation.md`](docs/
 Opportunity-Tracker/
 │
 ├── README.md
-├── LICENSE
 │
 ├── assets/
 │   └── architecture.png
