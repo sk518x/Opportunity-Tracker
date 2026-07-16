@@ -26,34 +26,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "=https://api.groq.com/openai/v1/chat/completions",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  model: \"llama-3.3-70b-versatile\",\n  messages: [{\n    role: \"user\",\n    content: \"You extract structured data from a forwarded post about a bursary, internship, or graduate program. Today's date is \" + $now.toFormat('yyyy-MM-dd') + \". Read the text below and return ONLY a raw JSON object (no markdown, no code fences) with these exact keys: title (string), org (string), type (one of: Bursary, Internship, Graduate Program, Learnership, Other), deadline (string, format YYYY-MM-DD, infer year if missing, empty string if no date mentioned), link (string, empty if none), requirements (string, short summary of eligibility criteria). Text:\\n\\n\" + $json.content\n  }]\n}) }}",
-        "options": {
-          "timeout": 60000
-        }
-      },
-      "id": "96db155b-3146-4c1a-9038-e578fae6804e",
-      "name": "Extract With Gemini",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        736,
-        -576
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "hWKVsEJ8JiFKbeNE",
-          "name": "Header Auth account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "jsCode": "const raw = $json.choices[0].message.content;\nconst withoutThinking = raw.replace(/<think>[\\s\\S]*?<\\/think>/gi, '').trim();\nconst jsonMatch = withoutThinking.match(/\\{[\\s\\S]*\\}/);\nconst cleaned = jsonMatch ? jsonMatch[0] : withoutThinking;\nlet data;\ntry {\n  data = JSON.parse(cleaned);\n} catch (e) {\n  data = { title: 'Could not parse — check manually', org: '', type: 'Other', deadline: '', link: '', requirements: raw.slice(0, 200) };\n}\nconst validTypes = ['Bursary', 'Internship', 'Graduate Program', 'Learnership', 'Other'];\nif (!validTypes.includes(data.type)) {\n  data.type = 'Other';\n}\ndata.status = 'Not started';\ndata.added_on = $now.toFormat('yyyy-MM-dd');\ndata.chat_id = $('Classify Message').item.json.chat_id;\nreturn [{ json: data }];"
       },
       "id": "b59e086a-c3cc-41c2-a158-5773a42bb2ed",
@@ -1449,6 +1421,34 @@
       ],
       "id": "d12d9796-9f24-435b-97f3-f9545f629ae8",
       "name": "Send Dashboard Data"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"llama-3.3-70b-versatile\",\n  messages: [{\n    role: \"user\",\n    content: \"You extract structured data from a forwarded post about a bursary, internship, or graduate program. Today's date is \" + $now.toFormat('yyyy-MM-dd') + \". Read the text below and return ONLY a raw JSON object (no markdown, no code fences) with these exact keys: title (string), org (string), type (one of: Bursary, Internship, Graduate Program, Learnership, Other), deadline (string, format YYYY-MM-DD, infer year if missing, empty string if no date mentioned), link (string, empty if none), requirements (string, short summary of eligibility criteria). Text:\\n\\n\" + $json.content\n  }]\n}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "96db155b-3146-4c1a-9038-e578fae6804e",
+      "name": "AI Extraction",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        736,
+        -576
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hWKVsEJ8JiFKbeNE",
+          "name": "Header Auth account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -1458,17 +1458,6 @@
         [
           {
             "node": "Classify Message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract With Gemini": {
-      "main": [
-        [
-          {
-            "node": "Parse Extracted Data",
             "type": "main",
             "index": 0
           }
@@ -1523,7 +1512,7 @@
       "main": [
         [
           {
-            "node": "Extract With Gemini",
+            "node": "AI Extraction",
             "type": "main",
             "index": 0
           }
@@ -1559,7 +1548,7 @@
       "main": [
         [
           {
-            "node": "Extract With Gemini",
+            "node": "AI Extraction",
             "type": "main",
             "index": 0
           }
@@ -1880,6 +1869,17 @@
           }
         ]
       ]
+    },
+    "AI Extraction": {
+      "main": [
+        [
+          {
+            "node": "Parse Extracted Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -1888,7 +1888,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "6a830bde-01f4-47c3-959a-eb0b078b4996",
+  "versionId": "ebf851b6-49b4-49f4-bb0c-37993eb420a0",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "175f061fb45f6d3836287c0373b6ed21a679d0231b55de22e0fbbe0a05501160"
