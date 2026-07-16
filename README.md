@@ -84,6 +84,8 @@ This project automates the collection process so that forwarding a post is enoug
 Opportunity-Tracker/
 │
 ├── README.md
+├── .gitignore
+├── .env.example
 │
 ├── assets/
 │   └── architecture.png
