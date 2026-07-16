@@ -49,6 +49,17 @@ This project automates the collection process so that forwarding a post is enoug
 
 ---
 
+## Repository Contents
+
+- `assets/` – Architecture diagram.
+- `dashboard/` – Web dashboard.
+- `database/` – PostgreSQL schema.
+- `workflow/` – n8n workflow export.
+- `screenshots/` – Images used throughout the README.
+- `.env.example` – Example environment variables for configuring the project.
+
+---
+
 ## Key design decisions
 
 - **PostgreSQL is the primary data store.** Google Sheets is a synchronized view rather than the main database.
