@@ -1,0 +1,19 @@
+# Environment variables
+.env
+
+# Node.js dependencies
+node_modules/
+
+# Local n8n data
+.n8n/
+
+# Logs
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Editor settings
+.vscode/
+.idea/
