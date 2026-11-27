@@ -232,7 +232,12 @@ Some of the most valuable lessons included:
 opportunity-tracker/
 │
 ├── README.md
-├── architecture-diagram.svg
+├── .gitignore
+├── assets/
+│   └── architecture-diagram.svg
+├── database/
+│   └── schema.sql               # PostgreSQL schema
+│
 ├── .env.example                    # Required credentials and config
 │
 ├── docs/
@@ -265,7 +270,7 @@ The general setup process is as follows:
 
 2. **Deploy n8n to Render** using the official Docker image, connected to your Neon PostgreSQL instance.
 
-3. **Create the opportunities table** using.
+3. **Create the opportunities table** using [schema.sql](database/schema.sql).
 
 4. **Import the n8n workflow** from `workflow/Opportunity_Tracker.json` and reconnect all credentials. No credentials are included in the exported workflow.
 
