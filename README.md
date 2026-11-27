@@ -51,13 +51,13 @@ This project removes the manual tracking step entirely: see a post, forward it, 
 │       ↓                                                     │
 │  Classify (text / link / photo)                             │
 │       ↓                                                     │
-│  Extract via Groq AI                                         │
+│  Extract via Groq AI                                        │
 │       ↓                                                     │
-│  Parse and validate                                          │
+│  Parse and validate                                         │
 │       ↓                                                     │
-│  Check for duplicates                                        │
+│  Check for duplicates                                       │
 │       ↓                                                     │
-│  Insert into PostgreSQL                                      │
+│  Insert into PostgreSQL                                     │
 │       ↓                                                     │
 │  Confirmation reply + instant Google Sheets sync            │
 └─────────────────────────────────────────────────────────────┘
@@ -69,15 +69,15 @@ This project removes the manual tracking step entirely: see a post, forward it, 
 ┌─────────────────────────────────────────────────────────────┐
 │                  DAILY SYNC (7 AM)                          │
 │                                                             │
-│  Read PostgreSQL records                                     │
+│  Read PostgreSQL records                                    │
 │       ↓                                                     │
-│  Calculate days remaining                                    │
+│  Calculate days remaining                                   │
 │       ↓                                                     │
 │  Split into Active / Expired                                │
 │       ↓                                                     │
-│  Rebuild both Google Sheets tabs                             │
+│  Rebuild both Google Sheets tabs                            │
 │       ↓                                                     │
-│  Send a digest if anything is closing soon                   │
+│  Send a digest if anything is closing soon                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -236,7 +236,7 @@ opportunity-tracker/
 ├── assets/
 │   └── architecture-diagram.svg
 ├── database/
-│   └── schema.sql               # PostgreSQL schema
+│   └── schema.sql                  # PostgreSQL schema
 │
 ├── .env.example                    # Required credentials and config
 │
