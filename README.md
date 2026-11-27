@@ -12,7 +12,7 @@ Designed to run independently of any personal device using free-tier cloud infra
 
 Watch a demonstration of the Opportunity Tracker:
 
-[▶ Watch the project demo](https://github.com/sk518x/Opportunity-Tracker/releases/download/v1.0-demo/Opportunity.Tracker.-.Demo.Video.mp4)
+[▶ Watch the project demo](https://youtu.be/PnwTr8FDFnE)
 
 The demo shows the complete workflow, from submitting an opportunity through Telegram to saving it in Google Sheets and receiving deadline notifications.
 
