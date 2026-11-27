@@ -66,43 +66,43 @@ The existing username is retained throughout this project for consistency.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         INTAKE (on message)                           │
-│                                                                         │
-│  Telegram message → Classify (text/link/photo) → Route                │
-│       │                    │                    │                     │
-│    [text]               [link]               [photo]                  │
-│       │                    │                    │                     │
-│       │              Fetch page,          Download image,             │
-│       │              strip HTML           encode base64               │
-│       │                    │                    │                     │
-│       └────────────────────┴────────────────────┘                     │
-│                             │                                          │
-│                    Groq AI extraction                                  │
-│                             │                                          │
-│                   Parse response → JSON                                │
-│                             │                                          │
-│                    Build dedup key                                     │
-│                             │                                          │
-│              INSERT into Postgres (dupes silently skipped)             │
-│                    │                    │                              │
-│              Confirm reply       Instant sheet refresh                 │
-│              (Telegram)          (full copy of daily sync chain,       │
-│                                    minus the digest message)           │
+│                         INTAKE (on message)                          │
+│                                                                      │
+│  Telegram message → Classify (text/link/photo) → Route               │
+│       │                    │                    │                    │
+│    [text]               [link]               [photo]                 │
+│       │                    │                    │                    │
+│       │              Fetch page,          Download image,            │
+│       │              strip HTML           encode base64              │
+│       │                    │                    │                    │
+│       └────────────────────┴────────────────────┘                    │
+│                             │                                        │
+│                    Groq AI extraction                                │
+│                             │                                        │
+│                   Parse response → JSON                              │
+│                             │                                        │
+│                    Build dedup key                                   │
+│                             │                                        │
+│              INSERT into Postgres (dupes silently skipped)           │
+│                    │                    │                            │
+│              Confirm reply       Instant sheet refresh               │
+│              (Telegram)          (full copy of daily sync chain,     │
+│                                    minus the digest message)         │
 └──────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────┐
-│                    DAILY SYNC (7am schedule)                          │
-│                                                                         │
-│  Read all from Postgres → calculate days-left → split by status       │
-│       │                                    │                           │
-│   [active]                            [expired]                        │
-│       │                                    │                           │
-│  Rewrite Active tab                  Rewrite Expired tab               │
-│       │                              + mark Expired in DB              │
-│  Build digest of items                                                 │
-│  closing within 5 days                                                 │
-│       │                                                                 │
-│  Send Telegram reminder (only if something is actually urgent)         │
+│                    DAILY SYNC (7am schedule)                         │
+│                                                                      │
+│  Read all from Postgres → calculate days-left → split by status      │
+│       │                                    │                         │
+│   [active]                            [expired]                      │
+│       │                                    │                         │
+│  Rewrite Active tab                  Rewrite Expired tab             │
+│       │                              + mark Expired in DB            │
+│  Build digest of items                                               │
+│  closing within 5 days                                               │
+│       │                                                              │
+│  Send Telegram reminder (only if something is actually urgent)       │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -112,7 +112,7 @@ The existing username is retained throughout this project for consistency.
 
 ## 5. Database Schema (Neon / Postgres)
 
-The full schema, with constraints and indexes, is in [`schema.sql`](../schema.sql). In short:
+The full schema, with constraints and indexes, is in [`schema.sql`](database/schema.sql). In short:
 
 - `dedup_key` = lowercased `title + "|" + org`, whitespace collapsed. The `UNIQUE` constraint plus `ON CONFLICT DO NOTHING` on insert is what makes duplicate detection automatic.
 - `type` is restricted to: `Bursary`, `Internship`, `Graduate Program`, `Learnership`, `Other`. The "Parse Extracted Data" node normalizes any unexpected AI output to `Other` before insert, so the constraint is never violated.
