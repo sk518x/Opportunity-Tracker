@@ -285,7 +285,14 @@ For detailed setup instructions, see [documentation.md](docs/documentation.md).
 
 ## Screenshots
 
+### Telegram Bot
+![Telegram Bot](screenshots/telegram-bot.png)
 
+### Google Sheets
+![Google Sheets](screenshots/google-sheets.png)
+
+### n8n Workflow
+![n8n Workflow](screenshots/n8n-workflow.png)
 
 ---
 
