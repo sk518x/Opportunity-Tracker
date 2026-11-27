@@ -112,7 +112,7 @@ The existing username is retained throughout this project for consistency.
 
 ## 5. Database Schema (Neon / Postgres)
 
-The full schema, with constraints and indexes, is in [`schema.sql`](database/schema.sql). In short:
+The full schema, with constraints and indexes, is in [schema.sql](database/schema.sql). In short:
 
 - `dedup_key` = lowercased `title + "|" + org`, whitespace collapsed. The `UNIQUE` constraint plus `ON CONFLICT DO NOTHING` on insert is what makes duplicate detection automatic.
 - `type` is restricted to: `Bursary`, `Internship`, `Graduate Program`, `Learnership`, `Other`. The "Parse Extracted Data" node normalizes any unexpected AI output to `Other` before insert, so the constraint is never violated.
